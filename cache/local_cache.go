@@ -23,26 +23,35 @@ func (i *item) deadlineBefore(t time.Time) bool {
 }
 
 type BuildInMapCache struct {
-	mutex sync.RWMutex
-	m     map[string]*item
-	close chan struct{}
+	mutex     sync.RWMutex
+	m         map[string]*item
+	close     chan struct{}
+	onEvicted func(key string, value any)
 }
 
 type BuildInMapCacheOption func(cache *BuildInMapCache)
 
-func NewLocalCache(interval time.Duration, opts ...BuildInMapCacheOption) *BuildInMapCache {
+func WithOnEvicted(fn func(key string, val any)) BuildInMapCacheOption {
+	return func(cache *BuildInMapCache) {
+		cache.onEvicted = fn
+	}
+}
+
+func NewBuildInMapCache(interval time.Duration, opts ...BuildInMapCacheOption) *BuildInMapCache {
 	res := &BuildInMapCache{
 		m:     map[string]*item{},
 		close: make(chan struct{}),
+		onEvicted: func(key string, value any) {
+
+		},
 	}
 
 	for _, opt := range opts {
 		opt(res)
 	}
 
-	ticker := time.NewTicker(interval)
-
 	go func() {
+		ticker := time.NewTicker(interval)
 		for {
 			select {
 			case t := <-ticker.C:
@@ -127,11 +136,12 @@ func (l *BuildInMapCache) LoadAndDelete(ctx context.Context, key string) (any, e
 }
 
 func (l *BuildInMapCache) delete(key string) {
-	_, ok := l.m[key]
+	val, ok := l.m[key]
 	if !ok {
 		return
 	}
 	delete(l.m, key)
+	l.onEvicted(key, val.value)
 }
 
 func (l *BuildInMapCache) Close() error {
