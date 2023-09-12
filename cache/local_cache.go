@@ -29,6 +29,7 @@ type BuildInMapCache struct {
 	onEvicted func(key string, value any)
 }
 
+// BuildInMapCacheOption option模式
 type BuildInMapCacheOption func(cache *BuildInMapCache)
 
 func WithOnEvicted(fn func(key string, val any)) BuildInMapCacheOption {
@@ -107,9 +108,13 @@ func (l *BuildInMapCache) Get(ctx context.Context, key string) (any, error) {
 }
 
 func (l *BuildInMapCache) Set(ctx context.Context, key string, value any, expireTime time.Duration) error {
-	i := &item{value: value}
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	return l.set(ctx, key, value, expireTime)
+}
+
+func (l *BuildInMapCache) set(ctx context.Context, key string, value any, expireTime time.Duration) error {
+	i := &item{value: value}
 	if expireTime > 0 {
 		i.expireTime = time.Now().Add(expireTime)
 	}
