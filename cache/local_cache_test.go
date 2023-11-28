@@ -4,6 +4,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"geek_cache/internal/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -24,7 +25,7 @@ func TestBuildInMapCache_Get(t *testing.T) {
 			cache: func() *BuildInMapCache {
 				return NewBuildInMapCache(10 * time.Second)
 			},
-			wantErr: fmt.Errorf("%w, key: %s", errKeyNotFound, "not exist key"),
+			wantErr: fmt.Errorf("%w, key: %s", errs.ErrKeyNotFound, "not exist key"),
 		},
 		{
 			name: "get value",
@@ -47,7 +48,7 @@ func TestBuildInMapCache_Get(t *testing.T) {
 				time.Sleep(3 * time.Second)
 				return res
 			},
-			wantErr: fmt.Errorf("%w, key: %s", errKeyNotFound, "not exist key"),
+			wantErr: fmt.Errorf("%w, key: %s", errs.ErrKeyNotFound, "not exist key"),
 		},
 	}
 

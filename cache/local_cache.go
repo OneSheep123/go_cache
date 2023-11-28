@@ -5,12 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"geek_cache/internal/errs"
 	"sync"
 	"time"
-)
-
-var (
-	errKeyNotFound = errors.New("cache：键不存在")
 )
 
 type item struct {
@@ -82,7 +79,7 @@ func (l *BuildInMapCache) Get(ctx context.Context, key string) (any, error) {
 	v, ok := l.m[key]
 	l.mutex.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("%w, key: %s", errKeyNotFound, key)
+		return nil, fmt.Errorf("%w, key: %s", errs.ErrKeyNotFound, key)
 	}
 
 	now := time.Now()
@@ -95,11 +92,11 @@ func (l *BuildInMapCache) Get(ctx context.Context, key string) (any, error) {
 
 		v, ok = l.m[key]
 		if !ok {
-			return nil, fmt.Errorf("%w, key: %s", errKeyNotFound, key)
+			return nil, fmt.Errorf("%w, key: %s", errs.ErrKeyNotFound, key)
 		}
 		if v.deadlineBefore(now) {
 			l.delete(key)
-			return nil, fmt.Errorf("%w, key: %s", errKeyNotFound, key)
+			return nil, fmt.Errorf("%w, key: %s", errs.ErrKeyNotFound, key)
 		}
 
 	}
@@ -134,7 +131,7 @@ func (l *BuildInMapCache) LoadAndDelete(ctx context.Context, key string) (any, e
 	defer l.mutex.Unlock()
 	v, ok := l.m[key]
 	if !ok {
-		return nil, fmt.Errorf("%w, key: %s", errKeyNotFound, key)
+		return nil, fmt.Errorf("%w, key: %s", errs.ErrKeyNotFound, key)
 	}
 	l.delete(key)
 	return v.value, nil

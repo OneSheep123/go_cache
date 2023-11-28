@@ -3,13 +3,9 @@ package cache
 
 import (
 	"context"
-	"errors"
+	"geek_cache/internal/errs"
 	"sync/atomic"
 	"time"
-)
-
-var (
-	errOverCapacity = errors.New("cache：超过容量限制")
 )
 
 type MaxCntCache struct {
@@ -62,7 +58,7 @@ func (m *MaxCntCache) Set(ctx context.Context, key string, value any, expireTime
 	_, ok := m.m[key]
 	if !ok {
 		if m.cnt+1 > m.maxCnt {
-			return errOverCapacity
+			return errs.ErrOverCapacity
 		}
 	}
 	return m.set(ctx, key, value, expireTime)
