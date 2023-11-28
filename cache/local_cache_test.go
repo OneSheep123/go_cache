@@ -73,6 +73,7 @@ func TestBuildInMapCache_Loop(t *testing.T) {
 	err := localCache.Set(context.Background(), "key1", 12, time.Millisecond)
 	require.NoError(t, err)
 	time.Sleep(3 * time.Second)
+	// 这里没有去调用Get方法，以免是Get操作导致key被删除
 	localCache.mutex.RLock()
 	defer localCache.mutex.RUnlock()
 	_, ok := localCache.m["key1"]

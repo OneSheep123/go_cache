@@ -20,9 +20,11 @@ func (i *item) deadlineBefore(t time.Time) bool {
 }
 
 type BuildInMapCache struct {
-	mutex     sync.RWMutex
-	m         map[string]*item
-	close     chan struct{}
+	mutex sync.RWMutex
+	m     map[string]*item
+	close chan struct{}
+
+	// CDC(change data capture)实现: 一个key被更新后进行通知或者操作一些事情
 	onEvicted func(key string, value any)
 }
 
@@ -88,7 +90,7 @@ func (l *BuildInMapCache) Get(ctx context.Context, key string) (any, error) {
 		l.mutex.Lock()
 		defer l.mutex.Unlock()
 		// 这里对if规则再进行校验，防止当前锁被Set操作拿到时，数据被进行了过期更新；被Delete操作拿到时，数据被删除掉
-		// （双重锁校验）
+		// （双重锁校验:double-check）
 
 		v, ok = l.m[key]
 		if !ok {
