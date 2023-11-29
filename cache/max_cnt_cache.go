@@ -22,6 +22,7 @@ func BuildMaxCntCache(b *BuildInMapCache, maxCnt int32) *MaxCntCache {
 
 	origin := b.onEvicted
 
+	// 在原有的onEvicted上，再次进行封装onEvicted，用于cnt--
 	res.onEvicted = func(key string, value any) {
 		atomic.AddInt32(&res.cnt, -1)
 		origin(key, value)
@@ -30,6 +31,7 @@ func BuildMaxCntCache(b *BuildInMapCache, maxCnt int32) *MaxCntCache {
 	return res
 }
 
+// Set 重写localCache中的set方法，用于cnt计数++
 func (m *MaxCntCache) Set(ctx context.Context, key string, value any, expireTime time.Duration) error {
 
 	// 1. 这种写法，如果 key 已经存在，你这计数就不准了
@@ -54,12 +56,14 @@ func (m *MaxCntCache) Set(ctx context.Context, key string, value any, expireTime
 	//return c.BuildInMapCache.Set(ctx, key, val, expiration)
 
 	m.mutex.Lock()
+	// 这里锁住下面的set了
 	defer m.mutex.Unlock()
 	_, ok := m.m[key]
 	if !ok {
 		if m.cnt+1 > m.maxCnt {
 			return errs.ErrOverCapacity
 		}
+		m.cnt++
 	}
 	return m.set(ctx, key, value, expireTime)
 }
