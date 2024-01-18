@@ -42,7 +42,7 @@ func (m *MaxCntCache) Set(ctx context.Context, key string, value any, expireTime
 	//}
 	//return c.BuildInMapCache.Set(ctx, key, val, expiration)
 
-	// 2. 这种写法，当mutex被解锁时候，锁被别人抢到且还未执行set时，cnt会被出现再加情况
+	// 2. 这种写法，当mutex被解锁时候(第55行)，若锁被别人抢到，且set了一样的key操作，此时cnt会被出现多加情况
 	//c.mutex.Lock()
 	//_, ok := c.data[key]
 	//if !ok {

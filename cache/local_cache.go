@@ -76,6 +76,8 @@ func NewBuildInMapCache(interval time.Duration, opts ...BuildInMapCacheOption) *
 	return res
 }
 
+// sql.DB, 获取连接时也是使用懒惰关闭, 获取链接时, 判断链接无效则进行关闭
+
 func (l *BuildInMapCache) Get(ctx context.Context, key string) (any, error) {
 	l.mutex.RLock()
 	v, ok := l.m[key]
