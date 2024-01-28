@@ -71,49 +71,35 @@ func (app *App) StartAndServe() {
 			}
 		}()
 	}
+	log.Println("服务启动完毕")
 	// 从这里开始优雅退出监听系统信号，强制退出以及超时强制退出。
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	select {
-	case <-c:
-		go func() {
-			afterFunc := time.AfterFunc(app.shutdownTimeout, func() {
-				os.Exit(1)
-			})
-			select {
-			case <-c:
-				os.Exit(1)
-			case <-afterFunc.C:
-			}
-		}()
-		app.shutdown()
-	}
-	// 优雅退出的具体步骤在 shutdown 里面实现
-	// 所以你需要在这里恰当的位置，调用 shutdown
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, signalsWindow...)
+	<-c
+	go func() {
+		select {
+		case <-c:
+			log.Printf("强制退出")
+			os.Exit(1)
+		case <-time.After(app.shutdownTimeout):
+			log.Printf("超时强制退出")
+			os.Exit(1)
+		}
+	}()
+	app.shutdown()
 }
 
 // shutdown 你要设计这里面的执行步骤。
 func (app *App) shutdown() {
 	log.Println("开始关闭应用，停止接收新请求")
-	ctx, cancelFunc := context.WithTimeout(context.Background(), app.shutdownTimeout)
-	defer cancelFunc()
-	// 你需要在这里让所有的 server 拒绝新请求
+	// 让所有的 server 拒绝新请求
 	for _, s := range app.servers {
 		s.rejectReq()
 	}
 
 	log.Println("等待正在执行请求完结...")
-	// 在这里等待一段时间
-	c := make(chan struct{})
-	go func() {
-		time.Sleep(app.waitTime)
-		log.Println("已有所有请求等待执行完毕")
-		close(c)
-	}()
-	select {
-	case <-ctx.Done():
-	case <-c:
-	}
+	// todo: 这里可以改造为实时统计正在处理的请求数量，为0 则下一步
+	time.Sleep(app.waitTime)
 
 	log.Println("开始关闭服务器...")
 	// 并发关闭服务器，同时要注意协调所有的 server 都关闭之后才能步入下一个阶段
@@ -123,7 +109,7 @@ func (app *App) shutdown() {
 	for _, s := range app.servers {
 		go func(s *Server) {
 			defer wg.Done()
-			if err := s.stop(ctx); err != nil {
+			if err := s.stop(); err != nil {
 				log.Printf("关闭%s出现错误，错误内容:%v", s.name, err)
 			}
 		}(s)
@@ -133,19 +119,18 @@ func (app *App) shutdown() {
 	log.Println("开始执行自定义回调")
 	// 并发执行回调，要注意协调所有的回调都执行完才会步入下一个阶段
 	wg.Add(len(app.cbs))
-
 	for _, cb := range app.cbs {
 		go func(cb ShutdownCallback) {
-			defer wg.Done()
-			cb(ctx)
+			cbsCtx, cFunc := context.WithTimeout(context.Background(), app.cbTimeout)
+			cb(cbsCtx)
+			cFunc()
+			wg.Done()
 		}(cb)
 	}
 
 	wg.Wait()
 	// 释放资源
 	log.Println("开始释放资源")
-
-	// 这一个步骤不需要你干什么，这是假装我们整个应用自己要释放一些资源
 	app.close()
 }
 
@@ -204,19 +189,7 @@ func (s *Server) rejectReq() {
 	s.mux.reject = true
 }
 
-func (s *Server) stop(ctx context.Context) error {
+func (s *Server) stop() error {
 	log.Printf("服务器%s关闭中", s.name)
-	c := make(chan struct{})
-	go func() {
-		// 模拟服务器关闭中
-		time.Sleep(2 * time.Second)
-		close(c)
-		log.Printf("服务器%s关闭完毕", s.name)
-	}()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-c:
-		return nil
-	}
+	return s.srv.Shutdown(context.Background())
 }
